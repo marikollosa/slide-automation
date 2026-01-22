@@ -76,6 +76,9 @@ const ORG_CHANGE_MAPPING: SlideMapping = {
     "[1]": { type: "cell", ref: "DG2" },
     "[2]": { type: "cell", ref: "DI2" },
   },
+  12: {
+    "[1]": { type: "cell", ref: "AH2"},
+  }
 };
 
 const NEW_TOOLS_MAPPING: SlideMapping = {
