@@ -4,33 +4,31 @@ import React, { useMemo, useState } from "react";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 
+type SlideTypeId = "org_change" | "new_tools" | "cw_risk_assessment";
+
 type SlideType = {
-  id: string;
+  id: SlideTypeId;
   label: string;
   description?: string;
 };
 
-const SLIDE_TYPES: SlideType[] = [
-  {
-    id: "org_change",
-    label: "Organization Change",
-    description:
-      "Upload the org change PPTX template + Excel file to generate the filled deck.",
-  },
-  {
-    id: "new_tools",
-    label: "New Tools / Surveys / Trainings",
-    description:
-      "Upload the New Tools/Surveys/Trainings template + Excel file to generate the filled deck.",
-  },
-];
-
 type CellSpec =
   | { type: "cell"; ref: string }
   | { type: "join"; refs: string[]; joinWith: string }
-  | { type: "const"; value: string };
+  | { type: "const"; value: string }
+  | {
+      type: "month_year";
+      ref: string;
+      format?: "Mon YYYY" | "MMMM YYYY" | "MM/YYYY";
+    };
 
 type SlideMapping = Record<number, Record<string, CellSpec>>;
+
+/**
+ * -----------------------------
+ * MAPPINGS
+ * -----------------------------
+ */
 
 const ORG_CHANGE_MAPPING: SlideMapping = {
   1: {
@@ -77,8 +75,8 @@ const ORG_CHANGE_MAPPING: SlideMapping = {
     "[2]": { type: "cell", ref: "DI2" },
   },
   12: {
-    "[1]": { type: "cell", ref: "AH2"},
-  }
+    "[1]": { type: "cell", ref: "AH2" },
+  },
 };
 
 const NEW_TOOLS_MAPPING: SlideMapping = {
@@ -111,7 +109,7 @@ const NEW_TOOLS_MAPPING: SlideMapping = {
   },
   8: {
     "[1]": { type: "cell", ref: "BW2" },
-    "[2]": { type: "join", refs: ["CD2", "CE2"], joinWith: " " }, // change to "\n" if you want a line break
+    "[2]": { type: "join", refs: ["CD2", "CE2"], joinWith: " " },
     "[3]": { type: "cell", ref: "CC2" },
   },
   9: {
@@ -150,8 +148,101 @@ const NEW_TOOLS_MAPPING: SlideMapping = {
   },
 };
 
+const CW_RISK_ASSESSMENT_MAPPING: SlideMapping = {
+  1: {
+    "[1]": { type: "cell", ref: "G2" },
+    // Month + year only from B2 (handles true Excel dates OR strings like M/D/YY HH:MM:SS)
+    "[2]": { type: "month_year", ref: "B2", format: "Mon YYYY" },
+  },
+
+  3: {
+    "[1]": { type: "cell", ref: "K2" },
+    "[2]": { type: "cell", ref: "K3" },
+    "[3]": { type: "cell", ref: "K4" },
+    "[4]": { type: "cell", ref: "K5" },
+  },
+
+  4: {
+    "[A1]": { type: "cell", ref: "H2" },
+    "[B1]": { type: "cell", ref: "H3" },
+    "[C1]": { type: "cell", ref: "H4" },
+    "[D1]": { type: "cell", ref: "H5" },
+
+    "[A2]": { type: "cell", ref: "I2" },
+    "[B2]": { type: "cell", ref: "I3" },
+    "[C2]": { type: "cell", ref: "I4" },
+    "[D2]": { type: "cell", ref: "I5" },
+
+    "[A3]": { type: "cell", ref: "J2" },
+    "[B3]": { type: "cell", ref: "J3" },
+    "[C3]": { type: "cell", ref: "J4" },
+    "[D3]": { type: "cell", ref: "J5" },
+
+    "[A4]": { type: "cell", ref: "K2" },
+    "[B4]": { type: "cell", ref: "K3" },
+    "[C4]": { type: "cell", ref: "K4" },
+    "[D4]": { type: "cell", ref: "K5" },
+  },
+
+  5: {
+    "[A1]": { type: "cell", ref: "L2" },
+    "[B1]": { type: "cell", ref: "L3" },
+    "[C1]": { type: "cell", ref: "L4" },
+    "[D1]": { type: "cell", ref: "L5" },
+
+    "[A2]": { type: "cell", ref: "M2" },
+    "[B2]": { type: "cell", ref: "M3" },
+    "[C2]": { type: "cell", ref: "M4" },
+    "[D2]": { type: "cell", ref: "M5" },
+
+    "[A3]": { type: "cell", ref: "N2" },
+    "[B3]": { type: "cell", ref: "N3" },
+    "[C3]": { type: "cell", ref: "N4" },
+    "[D3]": { type: "cell", ref: "N5" },
+
+    "[A4]": { type: "cell", ref: "O2" },
+    "[B4]": { type: "cell", ref: "O3" },
+    "[C4]": { type: "cell", ref: "O4" },
+    "[D4]": { type: "cell", ref: "O5" },
+
+    "[A5]": { type: "cell", ref: "P2" },
+    "[B5]": { type: "cell", ref: "P3" },
+    "[C5]": { type: "cell", ref: "P4" },
+    "[D5]": { type: "cell", ref: "P5" },
+
+    "[A6]": { type: "cell", ref: "Q2" },
+    "[B6]": { type: "cell", ref: "Q3" },
+    "[C6]": { type: "cell", ref: "Q4" },
+    "[D6]": { type: "cell", ref: "Q5" },
+  },
+};
+
+const SLIDE_DEFS: Array<SlideType & { mapping: SlideMapping }> = [
+  {
+    id: "org_change",
+    label: "Organization Change",
+    description:
+      "Upload the org change PPTX template + Excel file to generate the filled deck.",
+    mapping: ORG_CHANGE_MAPPING,
+  },
+  {
+    id: "new_tools",
+    label: "New Tools / Surveys / Trainings",
+    description:
+      "Upload the New Tools/Surveys/Trainings template + Excel file to generate the filled deck.",
+    mapping: NEW_TOOLS_MAPPING,
+  },
+  {
+    id: "cw_risk_assessment",
+    label: "CW Risk Assessment",
+    description:
+      "Upload the CW Risk Assessment template + Excel file to generate the filled deck.",
+    mapping: CW_RISK_ASSESSMENT_MAPPING,
+  },
+];
+
 export default function Page() {
-  const [slideType, setSlideType] = useState<string>(SLIDE_TYPES[0].id);
+  const [slideType, setSlideType] = useState<SlideTypeId>(SLIDE_DEFS[0].id);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [excelFile, setExcelFile] = useState<File | null>(null);
 
@@ -161,8 +252,8 @@ export default function Page() {
 
   const [resetKey, setResetKey] = useState(0);
 
-  const selectedSlideType = useMemo(
-    () => SLIDE_TYPES.find((s) => s.id === slideType),
+  const selectedSlideDef = useMemo(
+    () => SLIDE_DEFS.find((s) => s.id === slideType),
     [slideType]
   );
 
@@ -173,7 +264,7 @@ export default function Page() {
   function handleReset() {
     setError(null);
     setSuccessMsg(null);
-    setSlideType(SLIDE_TYPES[0].id);
+    setSlideType(SLIDE_DEFS[0].id);
     setTemplateFile(null);
     setExcelFile(null);
     setIsSubmitting(false);
@@ -200,33 +291,130 @@ export default function Page() {
       return;
     }
 
-    const mapping: SlideMapping =
-      slideType === "new_tools" ? NEW_TOOLS_MAPPING : ORG_CHANGE_MAPPING;
+    const mapping = selectedSlideDef?.mapping;
+    if (!mapping) {
+      setError("No mapping found for this slide type.");
+      return;
+    }
+
+    if (Object.keys(mapping).length === 0) {
+      setError(
+        `The "${selectedSlideDef?.label ?? "selected"}" slide type mapping is empty.`
+      );
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
       // ---- Read Excel in-browser ----
       const excelArrayBuf = await excelFile.arrayBuffer();
-      const workbook = XLSX.read(excelArrayBuf, { type: "array" });
+      const workbook = XLSX.read(excelArrayBuf, { type: "array", cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
 
-      const getCell = (ref: string): string => {
+      const getCellObj = (ref: string) => {
         const cell = (sheet as any)?.[ref];
+        return cell ?? null;
+      };
+
+      const getCell = (ref: string): string => {
+        const cell = getCellObj(ref);
         if (!cell || cell.v == null) return "N/A";
         const v = String(cell.w ?? cell.v).trim();
         return v === "" ? "N/A" : v;
+      };
+
+      const formatMonthYear = (
+        ref: string,
+        format: "Mon YYYY" | "MMMM YYYY" | "MM/YYYY" = "Mon YYYY"
+      ): string => {
+        const cell = getCellObj(ref);
+        if (!cell || cell.v == null) return "N/A";
+
+        let month: number | null = null; // 1-12
+        let year: number | null = null;
+
+        // 1) Date instance (because cellDates:true)
+        if (cell.v instanceof Date && !isNaN(cell.v.getTime())) {
+          month = cell.v.getMonth() + 1;
+          year = cell.v.getFullYear();
+        }
+
+        // 2) Excel serial number date
+        if ((month == null || year == null) && typeof cell.v === "number") {
+          const parsed = XLSX.SSF.parse_date_code(cell.v);
+          if (parsed && parsed.m && parsed.y) {
+            month = parsed.m;
+            year = parsed.y;
+          }
+        }
+
+        // 3) String like M/D/YY HH:MM:SS (or M/D/YYYY ...)
+        if (month == null || year == null) {
+          const s = String(cell.w ?? cell.v).trim();
+          const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+          if (m) {
+            month = Number(m[1]);
+            const yRaw = m[3];
+            year = yRaw.length === 2 ? 2000 + Number(yRaw) : Number(yRaw);
+          }
+        }
+
+        if (!month || !year) return "N/A";
+
+        const monShort = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const monLong = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+
+        if (format === "MM/YYYY") {
+          const mm = String(month).padStart(2, "0");
+          return `${mm}/${year}`;
+        }
+        if (format === "MMMM YYYY") {
+          return `${monLong[month - 1]} ${year}`;
+        }
+        return `${monShort[month - 1]} ${year}`;
       };
 
       const resolveSpec = (spec: CellSpec): string => {
         if (spec.type === "cell") return getCell(spec.ref);
         if (spec.type === "const") return spec.value;
 
+        if (spec.type === "month_year") {
+          return formatMonthYear(spec.ref, spec.format ?? "Mon YYYY");
+        }
+
+        // join
         const parts = spec.refs
           .map(getCell)
           .map((v) => String(v ?? "").trim())
-          .filter((v) => v.length > 0 && v !== "N/A"); // avoid "N/A N/A" joins
+          .filter((v) => v.length > 0 && v !== "N/A");
 
         return parts.length ? parts.join(spec.joinWith) : "N/A";
       };
@@ -278,19 +466,19 @@ export default function Page() {
           <label style={styles.label}>Slide type</label>
           <select
             value={slideType}
-            onChange={(e) => setSlideType(e.target.value)}
+            onChange={(e) => setSlideType(e.target.value as SlideTypeId)}
             style={styles.select}
             disabled={isSubmitting}
           >
-            {SLIDE_TYPES.map((t) => (
+            {SLIDE_DEFS.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}
               </option>
             ))}
           </select>
 
-          {selectedSlideType?.description && (
-            <div style={styles.helperText}>{selectedSlideType.description}</div>
+          {selectedSlideDef?.description && (
+            <div style={styles.helperText}>{selectedSlideDef.description}</div>
           )}
         </div>
 
@@ -465,7 +653,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "flex-start",
     fontSize: 14,
   },
-  fileMeta: { marginTop: 8, color: "#b8b8c7", fontSize: 14 },
   error: {
     padding: 12,
     borderRadius: 12,
